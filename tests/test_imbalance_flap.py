@@ -24,7 +24,7 @@ from auction_keeper.gas import DynamicGasPrice
 from auction_keeper.main import AuctionKeeper
 from auction_keeper.model import Parameters
 from tests.conftest import create_cdp_with_surplus, gal_address, get_node_gas_price, keeper_address, liquidate_urn, \
-    mcd, mint_mkr, models, other_address, our_address, repay_urn, simulate_model_output, web3
+    mcd, mint_vdgt, models, other_address, our_address, repay_urn, simulate_model_output, web3
 from tests.helper import args, kill_other_threads, time_travel_by, wait_for_other_threads, TransactionIgnoringTest
 
 
@@ -57,7 +57,7 @@ class TestAuctionKeeperFlapper(TransactionIgnoringTest):
         self.gal_address = gal_address(self.web3)
         self.mcd = mcd(self.web3)
         self.flapper = self.mcd.flapper
-        self.flapper.approve(self.mcd.mkr.address, directly(from_address=self.other_address))
+        self.flapper.approve(self.mcd.vdgt.address, directly(from_address=self.other_address))
 
         self.keeper = AuctionKeeper(args=args(f"--eth-from {self.keeper_address} "
                                               f"--type flap "
@@ -65,16 +65,16 @@ class TestAuctionKeeperFlapper(TransactionIgnoringTest):
                                               f"--model ./bogus-model.sh"), web3=self.web3)
         self.keeper.approve()
 
-        mint_mkr(self.mcd.mkr, self.keeper_address, Wad.from_number(50000))
-        mint_mkr(self.mcd.mkr, self.other_address, Wad.from_number(50000))
+        mint_vdgt(self.mcd.vdgt, self.keeper_address, Wad.from_number(50000))
+        mint_vdgt(self.mcd.vdgt, self.other_address, Wad.from_number(50000))
 
         assert isinstance(self.keeper.gas_price, DynamicGasPrice)
         # Since no args were assigned, gas strategy should return a GeometricGasPrice starting at the node gas price
         self.default_gas_price = get_node_gas_price(self.web3)
 
     def test_should_detect_flap(self, web3, mcd, c, gal_address, keeper_address):
-        # given some MKR is available to the keeper and a count of flap auctions
-        mint_mkr(mcd.mkr, keeper_address, Wad.from_number(50000))
+        # given some VDGT is available to the keeper and a count of flap auctions
+        mint_vdgt(mcd.vdgt, keeper_address, Wad.from_number(50000))
         kicks = mcd.flapper.kicks()
 
         # when surplus is generated
@@ -521,16 +521,16 @@ class TestAuctionKeeperFlapper(TransactionIgnoringTest):
         auction = self.flapper.bids(kick)
         assert auction.bid > Wad(0)
         assert round(Wad(auction.lot) / auction.bid, 2) == round(Wad.from_number(8.0), 2)
-        dai_before = self.mcd.vat.dai(self.keeper_address)
+        usdv_before = self.mcd.vat.usdv(self.keeper_address)
 
         # when
         time_travel_by(self.web3, self.flapper.ttl() + 1)
         # and
         self.keeper.check_all_auctions()
         wait_for_other_threads()
-        dai_after = self.mcd.vat.dai(self.keeper_address)
+        usdv_after = self.mcd.vat.usdv(self.keeper_address)
         # then
-        assert dai_before < dai_after
+        assert usdv_before < usdv_after
 
     def test_should_not_deal_when_auction_finished_but_somebody_else_won(self, kick):
         # given

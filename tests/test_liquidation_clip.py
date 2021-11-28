@@ -29,7 +29,7 @@ from pymaker.auctions import Clipper
 from pymaker.collateral import Collateral
 from pymaker.numeric import Wad, Ray, Rad
 from tests.conftest import create_unsafe_cdp, gal_address, get_collateral_price, keeper_address, liquidate_urn, mcd, \
-    models, other_address, purchase_dai, repay_urn, reserve_dai, set_collateral_price, simulate_model_output, web3
+    models, other_address, purchase_usdv, repay_urn, reserve_usdv, set_collateral_price, simulate_model_output, web3
 from tests.helper import args, time_travel_by, wait_for_other_threads, TransactionIgnoringTest
 
 
@@ -59,13 +59,13 @@ class ClipperTest(TransactionIgnoringTest):
         cls.web3 = web3()
         cls.mcd = mcd(cls.web3)
         cls.collateral = collateral_clip(cls.mcd)
-        cls.dai_collateral = cls.mcd.collaterals['ETH-C']
+        cls.usdv_collateral = cls.mcd.collaterals['ETH-C']
         cls.clipper = cls.collateral.clipper
         cls.keeper_address = keeper_address(cls.web3)
         cls.gal_address = gal_address(cls.web3)
         cls.other_address = other_address(cls.web3)
 
-    def take_with_dai(self, id: int, price: Ray, address: Address):
+    def take_with_usdv(self, id: int, price: Ray, address: Address):
         assert isinstance(id, int)
         assert isinstance(price, Ray)
         assert isinstance(address, Address)
@@ -74,9 +74,9 @@ class ClipperTest(TransactionIgnoringTest):
         assert lot > Wad(0)
 
         cost = Wad(price * Ray(lot))
-        logging.debug(f"reserving {cost} Dai to bid on auction {id}")
-        reserve_dai(self.mcd, self.dai_collateral, address, cost)
-        assert self.mcd.vat.dai(address) >= Rad(cost)
+        logging.debug(f"reserving {cost} Usdv to bid on auction {id}")
+        reserve_usdv(self.mcd, self.usdv_collateral, address, cost)
+        assert self.mcd.vat.usdv(address) >= Rad(cost)
 
         logging.debug(f"attempting to take clip {id} at {price}")
         self.clipper.validate_take(id, lot, price, address)
@@ -95,7 +95,7 @@ class ClipperTest(TransactionIgnoringTest):
         (needs_redo, auction_price, lot, tab) = self.clipper.status(id)
         while lot > Wad(0) and not needs_redo:
             if auction_price < our_price:
-                self.take_with_dai(id, our_price, address)
+                self.take_with_usdv(id, our_price, address)
                 break
             time_travel_by(self.web3, 1)
             (needs_redo, auction_price, lot, tab) = self.clipper.status(id)
@@ -108,9 +108,9 @@ class ClipperTest(TransactionIgnoringTest):
             (needs_redo, auction_price, lot, tab) = self.clipper.status(kick)
             if needs_redo:
                 print(f"Cleaning up dangling {self.collateral.ilk.name} clip auction {kick}")
-                purchase_dai(Wad(tab) + Wad(1), address)
-                assert self.mcd.dai_adapter.join(address, Wad(tab) + Wad(1)).transact(from_address=address)
-                assert self.mcd.vat.dai(address) >= tab
+                purchase_usdv(Wad(tab) + Wad(1), address)
+                assert self.mcd.usdv_adapter.join(address, Wad(tab) + Wad(1)).transact(from_address=address)
+                assert self.mcd.vat.usdv(address) >= tab
                 assert self.clipper.redo(kick, address).transact()
                 bid_price = Ray(tab / Rad(lot))
                 while auction_price > bid_price:
@@ -136,18 +136,18 @@ class TestAuctionKeeperBark(ClipperTest):
 
         assert get_collateral_price(cls.collateral) == Wad.from_number(200)
 
-        # Keeper won't bid with a 0 Dai balance
-        if cls.mcd.vat.dai(cls.keeper_address) == Rad(0):
-            purchase_dai(Wad.from_number(20), cls.keeper_address)
-        assert cls.mcd.dai_adapter.join(cls.keeper_address, Wad.from_number(20)).transact(
+        # Keeper won't bid with a 0 usdv balance
+        if cls.mcd.vat.usdv(cls.keeper_address) == Rad(0):
+            purchase_usdv(Wad.from_number(20), cls.keeper_address)
+        assert cls.mcd.usdv_adapter.join(cls.keeper_address, Wad.from_number(20)).transact(
             from_address=cls.keeper_address)
 
     def test_bark_and_clip(self, mcd, gal_address):
         # setup
         repay_urn(mcd, self.collateral, gal_address)
 
-        # given 21 Dai / (200 price * 2.0 mat) == 0.21 vault size
-        unsafe_cdp = create_unsafe_cdp(mcd, self.collateral, Wad.from_number(0.21), gal_address, draw_dai=False)
+        # given 21 usdv / (200 price * 2.0 mat) == 0.21 vault size
+        unsafe_cdp = create_unsafe_cdp(mcd, self.collateral, Wad.from_number(0.21), gal_address, draw_usdv=False)
         assert self.clipper.active_count() == 0
         kicks_before = self.clipper.kicks()
 
@@ -222,7 +222,7 @@ class TestAuctionKeeperClipper(ClipperTest):
         current_block = self.clipper.web3.eth.blockNumber
         return self.clipper.past_logs(current_block - 1, current_block)[0]
 
-    def simulate_model_bid(self, model, price: Ray, reserve_dai_for_bid=True):
+    def simulate_model_bid(self, model, price: Ray, reserve_usdv_for_bid=True):
         assert isinstance(price, Ray)
         assert price > Ray(0)
 
@@ -231,8 +231,8 @@ class TestAuctionKeeperClipper(ClipperTest):
         assert sale.lot > Wad(0)
 
         our_bid = Ray(sale.lot) * price
-        if reserve_dai_for_bid:
-            reserve_dai(self.mcd, self.dai_collateral, self.keeper_address, Wad(our_bid) + Wad(1))
+        if reserve_usdv_for_bid:
+            reserve_usdv(self.mcd, self.usdv_collateral, self.keeper_address, Wad(our_bid) + Wad(1))
         simulate_model_output(model=model, price=Wad(price))
 
     def test_keeper_config(self):
@@ -327,7 +327,7 @@ class TestAuctionKeeperClipper(ClipperTest):
         their_amt = Wad.from_number(0.6)
         their_bid = Wad(Ray(their_amt) * price)
         assert Rad(their_bid) < sale.tab  # ensure some collateral will be left over
-        reserve_dai(self.mcd, self.dai_collateral, self.other_address, their_bid)
+        reserve_usdv(self.mcd, self.usdv_collateral, self.other_address, their_bid)
         self.clipper.validate_take(kick, their_amt, price, self.other_address)
         assert self.clipper.take(kick, their_amt, price, self.other_address).transact(from_address=self.other_address)
         sale = self.clipper.sales(kick)
@@ -385,33 +385,33 @@ class TestAuctionKeeperClipper(ClipperTest):
         assert not needs_redo
         assert lot == Wad(0) or tab == Rad(0)
 
-    def test_should_take_partial_if_insufficient_dai_available(self, kick):
+    def test_should_take_partial_if_insufficient_usdv_available(self, kick):
         # given
         (model, model_factory) = models(self.keeper, kick)
         (needs_redo, price, initial_lot, initial_tab) = self.clipper.status(kick)
         assert initial_lot == Wad.from_number(1)
-        # and we exit all Dai out of the Vat
-        assert self.mcd.dai_adapter.exit(self.keeper_address, Wad(self.mcd.vat.dai(self.keeper_address)))\
+        # and we exit all usdv out of the Vat
+        assert self.mcd.usdv_adapter.exit(self.keeper_address, Wad(self.mcd.vat.usdv(self.keeper_address)))\
             .transact(from_address=self.keeper_address)
 
-        # when we have less Dai than we need to cover the auction
+        # when we have less usdv than we need to cover the auction
         our_price = Ray.from_number(187)
         assert our_price < price
-        dai_needed = initial_lot * Wad(our_price)
-        half_dai = dai_needed / Wad.from_number(2)
-        initial_dai_balance = Wad(self.mcd.vat.dai(self.keeper_address))
-        if initial_dai_balance < half_dai:
-            print(f"Reserving {half_dai - initial_dai_balance} Dai to get balance of {half_dai}")
-            reserve_dai(self.mcd, self.dai_collateral, self.keeper_address, half_dai - initial_dai_balance)
+        usdv_needed = initial_lot * Wad(our_price)
+        half_usdv = usdv_needed / Wad.from_number(2)
+        initial_usdv_balance = Wad(self.mcd.vat.usdv(self.keeper_address))
+        if initial_usdv_balance < half_usdv:
+            print(f"Reserving {half_usdv - initial_usdv_balance} Usdv to get balance of {half_usdv}")
+            reserve_usdv(self.mcd, self.usdv_collateral, self.keeper_address, half_usdv - initial_usdv_balance)
         else:
-            print(f"Abandoning {initial_dai_balance - half_dai} Dai to get balance of {half_dai}")
-            self.mcd.vat.move(self.keeper_address, self.gal_address, Rad(initial_dai_balance - half_dai))\
+            print(f"Abandoning {initial_usdv_balance - half_usdv} Usdv to get balance of {half_usdv}")
+            self.mcd.vat.move(self.keeper_address, self.gal_address, Rad(initial_usdv_balance - half_usdv))\
                 .transact(from_address=keeper_address)
-        dai_balance_before_take = Wad(self.mcd.vat.dai(self.keeper_address))
-        assert Wad(0) < dai_balance_before_take < dai_needed
+        usdv_balance_before_take = Wad(self.mcd.vat.usdv(self.keeper_address))
+        assert Wad(0) < usdv_balance_before_take < usdv_needed
 
         # then ensure we don't bid when the price is too high
-        self.simulate_model_bid(model, our_price, reserve_dai_for_bid=False)
+        self.simulate_model_bid(model, our_price, reserve_usdv_for_bid=False)
         self.keeper.check_all_auctions()
         self.keeper.check_for_bids()
         wait_for_other_threads()
@@ -426,7 +426,7 @@ class TestAuctionKeeperClipper(ClipperTest):
             if auction_price < our_price:
                 break
 
-        # then ensure our bid is submitted using available Dai
+        # then ensure our bid is submitted using available usdv
         # self.keeper.check_all_auctions()
         self.keeper.check_for_bids()
         wait_for_other_threads()
@@ -434,7 +434,7 @@ class TestAuctionKeeperClipper(ClipperTest):
         assert Wad(0) < lot < initial_lot
         our_take = self.last_log()
         assert isinstance(our_take, Clipper.TakeLog)
-        assert Wad(self.mcd.vat.dai(self.keeper_address)) < dai_balance_before_take
+        assert Wad(self.mcd.vat.usdv(self.keeper_address)) < usdv_balance_before_take
 
         # and ensure we don't place a subsequent dusty bid afterward
         self.keeper.check_all_auctions()

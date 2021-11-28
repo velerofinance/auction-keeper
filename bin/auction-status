@@ -103,7 +103,7 @@ def print_balances():
                   format_amount(d.dai.balance_of(our_address)),
                   format_amount(d.vat.dai(our_address)),
                   "", ""])
-    datas.append(["MKR", format_amount(d.mkr.balance_of(our_address)),
+    datas.append(["MKR", format_amount(d.vdgt.balance_of(our_address)),
                   "", "", ""])
     datas.append(["ETH",
                   format_amount(Wad(w3.eth.getBalance(our_address.address))),

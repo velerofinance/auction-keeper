@@ -148,13 +148,13 @@ class Auctions:
 
 class Reservoir:
     # Tracks expenditures on a single round of bid submissions, to prevent submitting bids which will fail because
-    # other bids used up the Dai/MKR balance (which doesn't update until the transaction is mined).
+    # other bids used up the Usdv/VDGT balance (which doesn't update until the transaction is mined).
     def __init__(self, level: Rad):
         assert isinstance(level, Rad)
         self.level = level
 
     def check_bid_cost(self, id: int, consume: Rad):
-        # Lowers the level of the reservoir when Dai/MKR is consumed by bids
+        # Lowers the level of the reservoir when USDV/VDGT is consumed by bids
         assert isinstance(id, int)
         assert isinstance(consume, Rad)
 
@@ -165,5 +165,5 @@ class Reservoir:
             return False
 
     def refill(self, produce: Rad):
-        # Increases Dai rebalanced during a cost check (not used for MKR)
+        # Increases Usdv rebalanced during a cost check (not used for VDGT)
         self.level += produce

@@ -109,9 +109,9 @@ class AuctionKeeper:
         parser.add_argument("--vulcanize-key", type=str, help="API key for the Vulcanize endpoint")
 
         parser.add_argument('--vat-dai-target', type=str,
-                            help="Amount of Dai to keep in the Vat contract or ALL to join entire token balance")
+                            help="Amount of Usdv to keep in the Vat contract or ALL to join entire token balance")
         parser.add_argument('--keep-dai-in-vat-on-exit', dest='exit_dai_on_shutdown', action='store_false',
-                            help="Retain Dai in the Vat on exit, saving gas when restarting the keeper")
+                            help="Retain Usdv in the Vat on exit, saving gas when restarting the keeper")
         parser.add_argument('--keep-gem-in-vat-on-exit', dest='exit_gem_on_shutdown', action='store_false',
                             help="Retain collateral in the Vat on exit")
         parser.add_argument('--return-gem-interval', type=int, default=300,
@@ -164,8 +164,8 @@ class AuctionKeeper:
         self.mcd = DssDeployment.from_node(web3=self.web3)
         self.vat = self.mcd.vat
         self.vow = self.mcd.vow
-        self.mkr = self.mcd.mkr
-        self.dai_join = self.mcd.dai_adapter
+        self.vdgt = self.mcd.vdgt
+        self.usdv_join = self.mcd.usdv_adapter
         if self.arguments.type in ['clip', 'flip']:
             self.collateral = self.mcd.collaterals[self.arguments.ilk]
             self.ilk = self.collateral.ilk
@@ -195,7 +195,7 @@ class AuctionKeeper:
             self.strategy = FlipperStrategy(self.auction_contract, self.min_collateral_lot)
         elif isinstance(self.auction_contract, Flapper):
             self.auction_type = 'flap'
-            self.strategy = FlapperStrategy(self.auction_contract, self.mkr.address)
+            self.strategy = FlapperStrategy(self.auction_contract, self.vdgt.address)
         elif isinstance(self.auction_contract, Flopper):
             self.auction_type = 'flop'
             self.strategy = FlopperStrategy(self.auction_contract)
@@ -227,7 +227,7 @@ class AuctionKeeper:
         self.auctions = Auctions(auction_contract=self.auction_contract, model_factory=ModelFactory(model_command))
         self.auctions_lock = threading.Lock()
         # Since we don't want periodically-pollled bidding threads to back up, use a flag instead of a lock.
-        self.is_joining_dai = False
+        self.is_joining_usdv = False
         self.dead_since = {}
         self.lifecycle = None
 
@@ -302,9 +302,9 @@ class AuctionKeeper:
     def startup(self):
         self.plunge()
         self.approve()
-        self.rebalance_dai()
+        self.rebalance_usdv()
         if self.auction_type == 'flap':
-            self.logger.info(f"MKR balance is {self.mkr.balance_of(self.our_address)}")
+            self.logger.info(f"VDGT balance is {self.vdgt.balance_of(self.our_address)}")
 
         notice_string = []
         if not self.arguments.create_auctions:
@@ -341,11 +341,11 @@ class AuctionKeeper:
     def approve(self):
         self.strategy.approve(gas_price=self.gas_price)
         time.sleep(1)
-        if self.dai_join:
-            if self.mcd.dai.allowance_of(self.our_address, self.dai_join.address) > Wad.from_number(2**50):
+        if self.usdv_join:
+            if self.mcd.usdv.allowance_of(self.our_address, self.usdv_join.address) > Wad.from_number(2 ** 50):
                 return
             else:
-                self.mcd.approve_dai(usr=self.our_address, gas_price=self.gas_price)
+                self.mcd.approve_usdv(usr=self.our_address, gas_price=self.gas_price)
         time.sleep(1)
         if self.collateral:
             self.collateral.approve(self.our_address, gas_price=self.gas_price)
@@ -363,20 +363,20 @@ class AuctionKeeper:
     def shutdown(self):
         with self.auctions_lock:
             del self.auctions
-        if self.arguments.exit_dai_on_shutdown:
-            self.exit_dai_on_shutdown()
+        if self.arguments.exit_usdv_on_shutdown:
+            self.exit_usdv_on_shutdown()
         if not self.arguments.exit_gem_on_shutdown:
             self.exit_gem()
 
     def is_shutting_down(self) -> bool:
         return self.lifecycle and self.lifecycle.terminated_externally
 
-    def exit_dai_on_shutdown(self):
-        # Unlike rebalance_dai(), this doesn't join, and intentionally doesn't check dust
-        vat_balance = Wad(self.vat.dai(self.our_address))
+    def exit_usdv_on_shutdown(self):
+        # Unlike rebalance_usdv(), this doesn't join, and intentionally doesn't check dust
+        vat_balance = Wad(self.vat.usdv(self.our_address))
         if vat_balance > Wad(0):
-            self.logger.info(f"Exiting {str(vat_balance)} Dai from the Vat before shutdown")
-            assert self.dai_join.exit(self.our_address, vat_balance).transact(gas_price=self.gas_price)
+            self.logger.info(f"Exiting {str(vat_balance)} Usdv from the Vat before shutdown")
+            assert self.usdv_join.exit(self.our_address, vat_balance).transact(gas_price=self.gas_price)
 
     def get_contract(self):
         if self.arguments.type in ['clip', 'flip']:
@@ -455,7 +455,7 @@ class AuctionKeeper:
 
     def check_vaults(self):
         started = datetime.now()
-        available_dai = self.mcd.dai.balance_of(self.our_address) + Wad(self.vat.dai(self.our_address))
+        available_usdv = self.mcd.usdv.balance_of(self.our_address) + Wad(self.vat.usdv(self.our_address))
 
         # Load auction parameters once for each iteration through vaults
         if self.auction_type == 'clip':
@@ -491,16 +491,16 @@ class AuctionKeeper:
                 ilk = self.vat.ilk(self.ilk.name)  # ilk.rate changes every block
 
             if self.auction_type == 'clip' and self.can_bark(ilk, urn, dog_hole, milk_hole, chop):
-                if self.arguments.bid_on_auctions and available_dai == Wad(0):
+                if self.arguments.bid_on_auctions and available_usdv == Wad(0):
                     self.logger.warning(f"Skipping opportunity to bark urn {urn.address} "
-                                        "because there is no Dai to bid")
+                                        "because there is no Usdv to bid")
                     break
                 self.mcd.dog.bark(ilk, urn).transact(gas_price=self.gas_price)
 
             if self.auction_type == 'flip' and self.can_bite(ilk, urn, box, dunk, chop):
-                if self.arguments.bid_on_auctions and available_dai == Wad(0):
+                if self.arguments.bid_on_auctions and available_usdv == Wad(0):
                     self.logger.warning(f"Skipping opportunity to bite urn {urn.address} "
-                                        "because there is no Dai to bid")
+                                        "because there is no Usdv to bid")
                     break
 
                 if urn.ink < self.min_collateral_lot:
@@ -513,24 +513,24 @@ class AuctionKeeper:
         # Cat.bite implicitly kicks off the flip auction; no further action needed.
 
     def check_flap(self):
-        # Check if Vow has a surplus of Dai compared to bad debt
-        joy = self.vat.dai(self.vow.address)
+        # Check if Vow has a surplus of Usdv compared to bad debt
+        joy = self.vat.usdv(self.vow.address)
         awe = self.vat.sin(self.vow.address)
 
         if not self.mcd.flapper.wards(self.mcd.vow.address):
             self.logger.warning(f"Vow is not authorized to kick on this flapper")
             return
 
-        # Check if Vow has Dai in excess
+        # Check if Vow has Usdv in excess
         if joy > awe:
             bump = self.vow.bump()
             hump = self.vow.hump()
 
-            # Check if Vow has enough Dai surplus to start an auction and that we have enough mkr balance
+            # Check if Vow has enough Usdv surplus to start an auction and that we have enough VDGT balance
             if (joy - awe) >= (bump + hump):
 
-                if self.arguments.bid_on_auctions and self.mkr.balance_of(self.our_address) == Wad(0):
-                    self.logger.warning("Skipping opportunity to heal/flap because there is no MKR to bid")
+                if self.arguments.bid_on_auctions and self.vdgt.balance_of(self.our_address) == Wad(0):
+                    self.logger.warning("Skipping opportunity to heal/flap because there is no VDGT to bid")
                     return
 
                 woe = self.vow.woe()
@@ -551,15 +551,15 @@ class AuctionKeeper:
                 self.vow.kiss(joy).transact(gas_price=self.gas_price)
                 return
         if woe > Rad(0):
-            joy = self.vat.dai(self.vow.address)
+            joy = self.vat.usdv(self.vow.address)
             if joy > woe:
                 self.vow.heal(woe).transact(gas_price=self.gas_price)
             else:
                 self.vow.heal(joy).transact(gas_price=self.gas_price)
 
     def check_flop(self):
-        # Check if Vow has a surplus of bad debt compared to Dai
-        joy = self.vat.dai(self.vow.address)
+        # Check if Vow has a surplus of bad debt compared to Usdv
+        joy = self.vat.usdv(self.vow.address)
         awe = self.vat.sin(self.vow.address)
 
         if not self.mcd.flopper.wards(self.mcd.vow.address):
@@ -576,13 +576,13 @@ class AuctionKeeper:
         sump = self.vow.sump()
         wait = self.vow.wait()
 
-        # Check if Vow has enough bad debt to start an auction and that we have enough dai balance
+        # Check if Vow has enough bad debt to start an auction and that we have enough usdv balance
         if woe + sin >= sump:
             # We need to bring Joy to 0 and Woe to at least sump
 
-            available_dai = self.mcd.dai.balance_of(self.our_address) + Wad(self.vat.dai(self.our_address))
-            if self.arguments.bid_on_auctions and available_dai == Wad(0):
-                self.logger.warning("Skipping opportunity to kiss/flog/heal/flop because there is no Dai to bid")
+            available_usdv = self.mcd.usdv.balance_of(self.our_address) + Wad(self.vat.usdv(self.our_address))
+            if self.arguments.bid_on_auctions and available_usdv == Wad(0):
+                self.logger.warning("Skipping opportunity to kiss/flog/heal/flop because there is no USDV to bid")
                 return
 
             # first use kiss() as it settled bad debt already in auctions and doesn't decrease woe
@@ -602,7 +602,7 @@ class AuctionKeeper:
                         self.vow.flog(era).transact(gas_price=self.gas_price)
 
                         # flog() sin until woe is above sump + joy
-                        joy = self.vat.dai(self.vow.address)
+                        joy = self.vat.usdv(self.vow.address)
                         if self.vow.woe() - joy >= sump:
                             break
 
@@ -614,17 +614,17 @@ class AuctionKeeper:
                         self.vow.flog(era).transact(gas_price=self.gas_price)
 
                         # flog() sin until woe is above sump + joy
-                        joy = self.vat.dai(self.vow.address)
+                        joy = self.vat.usdv(self.vow.address)
                         if self.vow.woe() - joy >= sump:
                             break
 
             # Reduce on-auction debt and reconcile remaining joy
-            joy = self.vat.dai(self.vow.address)
+            joy = self.vat.usdv(self.vow.address)
             if joy > Rad(0):
                 ash = self.vow.ash()
                 woe = self.vow.woe()
                 self.reconcile_debt(joy, ash, woe)
-                joy = self.vat.dai(self.vow.address)
+                joy = self.vat.usdv(self.vow.address)
 
             woe = self.vow.woe()
             if sump <= woe and joy == Rad(0):
@@ -663,13 +663,13 @@ class AuctionKeeper:
                          f"{(datetime.now() - started).seconds} seconds")
 
     def check_for_bids(self):
-        # Initialize the reservoir with Dai/MKR balance for this round of bid submissions.
+        # Initialize the reservoir with Usdv/Vdgt balance for this round of bid submissions.
         # This isn't a perfect solution as it omits the cost of bids submitted from the last round.
         # Recreating the reservoir preserves the stateless design of this keeper.
         if self.auction_type in ['clip', 'flip', 'flop']:
-            reservoir = Reservoir(self.vat.dai(self.our_address))
+            reservoir = Reservoir(self.vat.usdv(self.our_address))
         elif self.auction_type == 'flap':
-            reservoir = Reservoir(Rad(self.mkr.balance_of(self.our_address)))
+            reservoir = Reservoir(Rad(self.vdgt.balance_of(self.our_address)))
         else:
             raise RuntimeError("Unsupported auction type")
         
@@ -729,9 +729,9 @@ class AuctionKeeper:
                 if self.deal_all or input.guy in self.deal_for:
                     self.strategy.deal(id).transact(gas_price=self.gas_price)
 
-                    # Upon winning a flip or flop auction, we may need to replenish Dai to the Vat.
-                    # Upon winning a flap auction, we may want to withdraw won Dai from the Vat.
-                    self.rebalance_dai()
+                    # Upon winning a flip or flop auction, we may need to replenish Usdv to the Vat.
+                    # Upon winning a flap auction, we may want to withdraw won Usdv from the Vat.
+                    self.rebalance_usdv()
                 else:
                     logging.debug(f"Not dealing {id} with guy={input.guy}")
 
@@ -836,17 +836,17 @@ class AuctionKeeper:
         assert isinstance(id, int)
         assert isinstance(cost, Rad)
 
-        # If this is an auction where we bid with Dai...
+        # If this is an auction where we bid with Usdv...
         if self.auction_type in ['clip', 'flip', 'flop']:
             if not reservoir.check_bid_cost(id, cost):
                 if not already_rebalanced:
-                    # Try to synchronously join Dai the Vat
-                    if self.is_joining_dai:
+                    # Try to synchronously join Usdv the Vat
+                    if self.is_joining_usdv:
                         self.logger.info(f"Bid cost {str(cost)} exceeds reservoir level of {reservoir.level}; "
-                                          "waiting for Dai to rebalance")
+                                          "waiting for Usdv to rebalance")
                         return False
                     else:
-                        rebalanced = self.rebalance_dai()
+                        rebalanced = self.rebalance_usdv()
                         if rebalanced and rebalanced > Wad(0):
                             reservoir.refill(Rad(rebalanced))
                             return self.check_bid_cost(id, cost, reservoir, already_rebalanced=True)
@@ -854,73 +854,73 @@ class AuctionKeeper:
                 self.logger.info(f"Bid cost {str(cost)} exceeds reservoir level of {reservoir.level}; "
                                   "bid will not be submitted")
                 return False
-        # If this is an auction where we bid with MKR...
+        # If this is an auction where we bid with VDGT...
         elif self.auction_type == 'flap':
-            mkr_balance = self.mkr.balance_of(self.our_address)
-            if cost > Rad(mkr_balance):
+            vdgt_balance = self.vdgt.balance_of(self.our_address)
+            if cost > Rad(vdgt_balance):
                 self.logger.debug(f"Bid cost {str(cost)} exceeds reservoir level of {reservoir.level}; "
                                   "bid will not be submitted")
                 return False
         return True
 
-    def rebalance_dai(self) -> Optional[Wad]:
-        # Returns amount joined (positive) or exited (negative) as a result of rebalancing towards vat_dai_target
+    def rebalance_usdv(self) -> Optional[Wad]:
+        # Returns amount joined (positive) or exited (negative) as a result of rebalancing towards vat_usdv_target
 
-        if self.arguments.vat_dai_target is None:
+        if self.arguments.vat_usdv_target is None:
             return None
 
-        logging.info(f"Checking if internal Dai balance needs to be rebalanced")
-        dai = self.dai_join.dai()
-        token_balance = dai.balance_of(self.our_address)  # Wad
+        logging.info(f"Checking if internal Usdv balance needs to be rebalanced")
+        usdv = self.usdv_join.usdv()
+        token_balance = usdv.balance_of(self.our_address)  # Wad
         # Prevent spending gas on small rebalances
         dust = Wad(self.mcd.vat.ilk(self.ilk.name).dust) if self.ilk else Wad.from_number(20)
 
-        dai_to_join = Wad(0)
-        dai_to_exit = Wad(0)
+        usdv_to_join = Wad(0)
+        usdv_to_exit = Wad(0)
         try:
-            if self.arguments.vat_dai_target.upper() == "ALL":
-                dai_to_join = token_balance
+            if self.arguments.vat_usdv_target.upper() == "ALL":
+                usdv_to_join = token_balance
             else:
-                dai_target = Wad.from_number(float(self.arguments.vat_dai_target))
-                if dai_target < dust:
-                    self.logger.warning(f"Dust cutoff of {dust} exceeds Dai target {dai_target}; "
+                usdv_target = Wad.from_number(float(self.arguments.vat_usdv_target))
+                if usdv_target < dust:
+                    self.logger.warning(f"Dust cutoff of {dust} exceeds Usdv target {usdv_target}; "
                                         "please adjust configuration accordingly")
-                vat_balance = Wad(self.vat.dai(self.our_address))
-                if vat_balance < dai_target:
-                    dai_to_join = dai_target - vat_balance
-                elif vat_balance > dai_target:
-                    dai_to_exit = vat_balance - dai_target
+                vat_balance = Wad(self.vat.usdv(self.our_address))
+                if vat_balance < usdv_target:
+                    usdv_to_join = usdv_target - vat_balance
+                elif vat_balance > usdv_target:
+                    usdv_to_exit = vat_balance - usdv_target
         except ValueError:
-            raise ValueError("Unsupported --vat-dai-target")
+            raise ValueError("Unsupported --vat-usdv-target")
 
-        if dai_to_join >= dust:
+        if usdv_to_join >= dust:
             # Join tokens to the vat
-            if token_balance >= dai_to_join:
-                self.logger.info(f"Joining {str(dai_to_join)} Dai to the Vat")
-                return self.join_dai(dai_to_join)
+            if token_balance >= usdv_to_join:
+                self.logger.info(f"Joining {str(usdv_to_join)} Usdv to the Vat")
+                return self.join_usdv(usdv_to_join)
             elif token_balance > Wad(0):
-                self.logger.warning(f"Insufficient balance to maintain Dai target; joining {str(token_balance)} "
-                                    "Dai to the Vat")
-                return self.join_dai(token_balance)
+                self.logger.warning(f"Insufficient balance to maintain Usdv target; joining {str(token_balance)} "
+                                    "Usdv to the Vat")
+                return self.join_usdv(token_balance)
             else:
-                self.logger.warning("Insufficient Dai is available to join to Vat; cannot maintain Dai target")
+                self.logger.warning("Insufficient Usdv is available to join to Vat; cannot maintain Usdv target")
                 return Wad(0)
-        elif dai_to_exit > dust:
-            # Exit dai from the vat
-            self.logger.info(f"Exiting {str(dai_to_exit)} Dai from the Vat")
-            assert self.dai_join.exit(self.our_address, dai_to_exit).transact(gas_price=self.gas_price)
-            return dai_to_exit * -1
-        self.logger.info(f"Dai token balance: {str(dai.balance_of(self.our_address))}, "
-                         f"Vat balance: {self.vat.dai(self.our_address)}")
+        elif usdv_to_exit > dust:
+            # Exit usdv from the vat
+            self.logger.info(f"Exiting {str(usdv_to_exit)} Usdv from the Vat")
+            assert self.usdv_join.exit(self.our_address, usdv_to_exit).transact(gas_price=self.gas_price)
+            return usdv_to_exit * -1
+        self.logger.info(f"Usdv token balance: {str(usdv.balance_of(self.our_address))}, "
+                         f"Vat balance: {self.vat.usdv(self.our_address)}")
 
-    def join_dai(self, amount: Wad):
+    def join_usdv(self, amount: Wad):
         assert isinstance(amount, Wad)
-        assert not self.is_joining_dai
+        assert not self.is_joining_usdv
         try:
-            self.is_joining_dai = True
-            assert self.dai_join.join(self.our_address, amount).transact(gas_price=self.gas_price)
+            self.is_joining_usdv = True
+            assert self.usdv_join.join(self.our_address, amount).transact(gas_price=self.gas_price)
         finally:
-            self.is_joining_dai = False
+            self.is_joining_usdv = False
         return amount
 
     def exit_gem(self):

@@ -30,7 +30,7 @@ from pymaker.auctions import Flopper
 from pymaker.deployment import DssDeployment
 from pymaker.numeric import Wad, Ray, Rad
 from tests.conftest import bite, create_unsafe_cdp, flog_and_heal, gal_address, get_collateral_price, keeper_address, \
-    liquidate_urn, mcd, models, our_address, other_address, repay_urn, reserve_dai, set_collateral_price, \
+    liquidate_urn, mcd, models, our_address, other_address, repay_urn, reserve_usdv, set_collateral_price, \
     simulate_model_output, web3
 
 from tests.helper import args, time_travel_by, wait_for_other_threads, TransactionIgnoringTest
@@ -44,22 +44,22 @@ def c(mcd):
 
 @pytest.fixture()
 def kick(web3: Web3, mcd: DssDeployment, gal_address, other_address) -> int:
-    joy = mcd.vat.dai(mcd.vow.address)
+    joy = mcd.vat.usdv(mcd.vow.address)
     woe = (mcd.vat.sin(mcd.vow.address) - mcd.vow.sin()) - mcd.vow.ash()
     print(f'joy={str(joy)[:6]}, woe={str(woe)[:6]}')
 
     if woe < joy:
         # Bite gal CDP
         c = mcd.collaterals['ETH-A']
-        unsafe_cdp = create_unsafe_cdp(mcd, c, Wad.from_number(2), other_address, draw_dai=False)
+        unsafe_cdp = create_unsafe_cdp(mcd, c, Wad.from_number(2), other_address, draw_usdv=False)
         flip_kick = bite(mcd, c, unsafe_cdp)
 
-        # Generate some Dai, bid on and win the flip auction without covering all the debt
-        reserve_dai(mcd, c, gal_address, Wad.from_number(100))
+        # Generate some Usdv, bid on and win the flip auction without covering all the debt
+        reserve_usdv(mcd, c, gal_address, Wad.from_number(100))
         c.flipper.approve(mcd.vat.address, approval_function=hope_directly(from_address=gal_address))
         current_bid = c.flipper.bids(flip_kick)
         bid = Rad.from_number(1.9)
-        assert mcd.vat.dai(gal_address) > bid
+        assert mcd.vat.usdv(gal_address) > bid
         assert c.flipper.tend(flip_kick, current_bid.lot, bid).transact(from_address=gal_address)
         time_travel_by(web3, c.flipper.ttl()+1)
         assert c.flipper.deal(flip_kick).transact()
@@ -69,7 +69,7 @@ def kick(web3: Web3, mcd: DssDeployment, gal_address, other_address) -> int:
     # Kick off the flop auction
     woe = (mcd.vat.sin(mcd.vow.address) - mcd.vow.sin()) - mcd.vow.ash()
     assert mcd.vow.sump() <= woe
-    assert mcd.vat.dai(mcd.vow.address) == Rad(0)
+    assert mcd.vat.usdv(mcd.vow.address) == Rad(0)
     assert mcd.vow.flop().transact(from_address=gal_address)
     return mcd.flopper.kicks()
 
@@ -98,8 +98,8 @@ class TestAuctionKeeperFlopper(TransactionIgnoringTest):
         assert isinstance(self.keeper.gas_price, DynamicGasPrice)
         self.default_gas_price = self.keeper.gas_price.get_gas_price(0)
 
-        reserve_dai(self.mcd, self.mcd.collaterals['ETH-C'], self.keeper_address, Wad.from_number(200.00000))
-        reserve_dai(self.mcd, self.mcd.collaterals['ETH-C'], self.other_address, Wad.from_number(200.00000))
+        reserve_usdv(self.mcd, self.mcd.collaterals['ETH-C'], self.keeper_address, Wad.from_number(200.00000))
+        reserve_usdv(self.mcd, self.mcd.collaterals['ETH-C'], self.other_address, Wad.from_number(200.00000))
 
         self.sump = self.mcd.vow.sump()  # Rad
 
@@ -130,18 +130,18 @@ class TestAuctionKeeperFlopper(TransactionIgnoringTest):
 
     def test_should_detect_flop(self, web3, c, mcd, other_address, keeper_address):
         # given a count of flop auctions
-        reserve_dai(mcd, c, keeper_address, Wad.from_number(230))
+        reserve_usdv(mcd, c, keeper_address, Wad.from_number(230))
         kicks = mcd.flopper.kicks()
 
         # and an undercollateralized CDP is bitten
-        unsafe_cdp = create_unsafe_cdp(mcd, c, Wad.from_number(5), other_address, draw_dai=False)
+        unsafe_cdp = create_unsafe_cdp(mcd, c, Wad.from_number(5), other_address, draw_usdv=False)
         assert mcd.cat.bite(unsafe_cdp.ilk, unsafe_cdp).transact()
 
         # when the auction ends without debt being covered
         time_travel_by(web3, c.flipper.tau() + 1)
 
         # then ensure testchain is in the appropriate state
-        joy = mcd.vat.dai(mcd.vow.address)
+        joy = mcd.vat.usdv(mcd.vow.address)
         awe = mcd.vat.sin(mcd.vow.address)
         woe = (mcd.vat.sin(mcd.vow.address) - mcd.vow.sin()) - mcd.vow.ash()
         sin = mcd.vow.sin()
@@ -382,7 +382,7 @@ class TestAuctionKeeperFlopper(TransactionIgnoringTest):
         # given
         kick = self.flopper.kicks()
         (model, model_factory) = models(self.keeper, kick)
-        mkr_before = self.mcd.mkr.balance_of(self.keeper_address)
+        vfgt_before = self.mcd.vdgt.balance_of(self.keeper_address)
 
         # when
         simulate_model_output(model=model, price=Wad.from_number(575.0))
@@ -393,8 +393,8 @@ class TestAuctionKeeperFlopper(TransactionIgnoringTest):
         # then
         auction = self.flopper.bids(kick)
         assert round(auction.bid / Rad(auction.lot), 2) == round(Rad.from_number(575.0), 2)
-        mkr_after = self.mcd.mkr.balance_of(self.keeper_address)
-        assert mkr_before == mkr_after
+        vdgt_after = self.mcd.vdgt.balance_of(self.keeper_address)
+        assert vfgt_before == vdgt_after
 
         # cleanup
         time_travel_by(self.web3, self.flopper.ttl() + 1)
@@ -403,7 +403,7 @@ class TestAuctionKeeperFlopper(TransactionIgnoringTest):
     def test_should_bid_even_if_there_is_already_a_bidder(self, kick):
         # given
         (model, model_factory) = models(self.keeper, kick)
-        mkr_before = self.mcd.mkr.balance_of(self.keeper_address)
+        vdgt_before = self.mcd.vdgt.balance_of(self.keeper_address)
         # and
         lot = Wad.from_number(0.000016)
         assert self.flopper.dent(kick, lot, self.sump).transact(from_address=self.other_address)
@@ -419,8 +419,8 @@ class TestAuctionKeeperFlopper(TransactionIgnoringTest):
         auction = self.flopper.bids(kick)
         assert auction.lot != lot
         assert round(auction.bid / Rad(auction.lot), 2) == round(Rad.from_number(825.0), 2)
-        mkr_after = self.mcd.mkr.balance_of(self.keeper_address)
-        assert mkr_before == mkr_after
+        vdgt_after = self.mcd.vdgt.balance_of(self.keeper_address)
+        assert vdgt_before == vdgt_after
 
         # cleanup
         time_travel_by(self.web3, self.flopper.ttl() + 1)
@@ -567,7 +567,7 @@ class TestAuctionKeeperFlopper(TransactionIgnoringTest):
         wait_for_other_threads()
         # then
         assert self.lot_implies_price(kick, Wad.from_number(825.0))
-        mkr_before = self.mcd.mkr.balance_of(self.keeper_address)
+        vdgt_before = self.mcd.vdgt.balance_of(self.keeper_address)
 
         # when
         time_travel_by(self.web3, self.flopper.ttl() + 1)
@@ -575,12 +575,12 @@ class TestAuctionKeeperFlopper(TransactionIgnoringTest):
         self.keeper.check_all_auctions()
         wait_for_other_threads()
         # then
-        mkr_after = self.mcd.mkr.balance_of(self.keeper_address)
-        assert mkr_before < mkr_after
+        vdgt_after = self.mcd.vdgt.balance_of(self.keeper_address)
+        assert vdgt_before < vdgt_after
 
     def test_should_not_deal_when_auction_finished_but_somebody_else_won(self, kick):
         # given
-        mkr_before = self.mcd.mkr.balance_of(self.keeper_address)
+        mkr_before = self.mcd.vdgt.balance_of(self.keeper_address)
         # and
         self.dent(kick, self.other_address, Wad.from_number(0.000015), self.sump)
         assert self.flopper.bids(kick).lot == Wad.from_number(0.000015)
@@ -591,7 +591,7 @@ class TestAuctionKeeperFlopper(TransactionIgnoringTest):
         self.keeper.check_all_auctions()
         wait_for_other_threads()
         # then
-        mkr_after = self.mcd.mkr.balance_of(self.keeper_address)
+        mkr_after = self.mcd.vdgt.balance_of(self.keeper_address)
         assert mkr_before == mkr_after
 
     def test_should_obey_gas_price_provided_by_the_model(self, kick):
@@ -676,9 +676,9 @@ class TestAuctionKeeperFlopper(TransactionIgnoringTest):
     @classmethod
     def cleanup_debt(cls, web3, mcd):
         # Cancel out surplus and debt
-        dai_vow = mcd.vat.dai(mcd.vow.address)
-        assert dai_vow <= mcd.vow.woe()
-        assert mcd.vow.heal(dai_vow).transact()
+        usdv_vow = mcd.vat.usdv(mcd.vow.address)
+        assert usdv_vow <= mcd.vow.woe()
+        assert mcd.vow.heal(usdv_vow).transact()
 
     @classmethod
     def teardown_class(cls):

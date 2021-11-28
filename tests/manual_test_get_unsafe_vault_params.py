@@ -55,4 +55,4 @@ if ink_osm != ink:
 art = Ray(target_art)
 collat_ratio = Ray(ink) * Ray(osm_price) / (art * ilk.rate)
 
-print(f"frob with ink={ink} {ilk.name}, art={art} Dai for {r(collat_ratio*100,6)}% collateralization")
+print(f"frob with ink={ink} {ilk.name}, art={art} Usdv for {r(collat_ratio*100,6)}% collateralization")

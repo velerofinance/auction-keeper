@@ -65,7 +65,7 @@ class Status:
         assert isinstance(flipper, Address) or (flipper is None)
         assert isinstance(flapper, Address) or (flapper is None)
         assert isinstance(flopper, Address) or (flopper is None)
-        # Numeric type of bid and lot depends on auction type; Dai values are bid in Rad, collateral and MKR in Wad.
+        # Numeric type of bid and lot depends on auction type; Usdv values are bid in Rad, collateral and VDGT in Wad.
         assert isinstance(bid, Wad) or isinstance(bid, Rad) or isinstance(bid, Ray)
         assert isinstance(lot, Wad) or isinstance(lot, Rad)
         assert isinstance(tab, Rad) or (tab is None)

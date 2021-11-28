@@ -94,17 +94,17 @@ def wrap_eth(mcd: DssDeployment, address: Address, amount: Wad):
     assert collateral.gem.deposit(amount).transact(from_address=address)
 
 
-def mint_mkr(mkr: DSToken, recipient_address: Address, amount: Wad):
-    assert isinstance(mkr, DSToken)
+def mint_vdgt(vdgt: DSToken, recipient_address: Address, amount: Wad):
+    assert isinstance(vdgt, DSToken)
     assert isinstance(recipient_address, Address)
     assert isinstance(amount, Wad)
     assert amount > Wad(0)
 
     deployment_address = Address("0x00a329c0648769A73afAc7F9381E08FB43dBEA72")
-    assert mkr.mint(amount).transact(from_address=deployment_address)
-    assert mkr.balance_of(deployment_address) > Wad(0)
-    assert mkr.approve(recipient_address).transact(from_address=deployment_address)
-    assert mkr.transfer(recipient_address, amount).transact(from_address=deployment_address)
+    assert vdgt.mint(amount).transact(from_address=deployment_address)
+    assert vdgt.balance_of(deployment_address) > Wad(0)
+    assert vdgt.approve(recipient_address).transact(from_address=deployment_address)
+    assert vdgt.transfer(recipient_address, amount).transact(from_address=deployment_address)
 
 
 @pytest.fixture(scope="session")
@@ -195,7 +195,7 @@ def max_dart_for_ink(mcd: DssDeployment, collateral: Collateral, ink: Wad) -> Wa
     return dart
 
 
-def reserve_dai(mcd: DssDeployment, c: Collateral, usr: Address, amount: Wad):
+def reserve_usdv(mcd: DssDeployment, c: Collateral, usr: Address, amount: Wad):
     assert isinstance(mcd, DssDeployment)
     assert isinstance(c, Collateral)
     assert isinstance(usr, Address)
@@ -210,33 +210,33 @@ def reserve_dai(mcd: DssDeployment, c: Collateral, usr: Address, amount: Wad):
     rate = ilk.rate  # Ray
     assert rate >= Ray.from_number(1)
     urn = mcd.vat.urn(ilk, usr)
-    tab: Rad = (Rad(mcd.vat.dai(usr)) + Rad(amount)) * ilk.rate
+    tab: Rad = (Rad(mcd.vat.usdv(usr)) + Rad(amount)) * ilk.rate
     assert tab > Rad(0)
-    print(f"attempting to reserve {amount} Dai using {c.ilk.name} urn {urn}")
+    print(f"attempting to reserve {amount} Usdv using {c.ilk.name} urn {urn}")
     ink_required = Wad(tab) + Wad(1)  # extra to prevent Rad-to-Wad rounding issues
     dink = max(Wad(0), ink_required - urn.ink)
     if dink > Wad(0):
-        print(f'ink={str(urn.ink)} art={str(urn.art)}; {str(dink)} more {ilk.name} is required to draw {str(amount)} Dai')
+        print(f'ink={str(urn.ink)} art={str(urn.art)}; {str(dink)} more {ilk.name} is required to draw {str(amount)} Usdv')
         wrap_eth(mcd, usr, dink)
         c.approve(usr)
         assert c.adapter.join(usr, dink).transact(from_address=usr)
     else:
-        print(f"no additional collateral is required to draw {str(amount)} Dai")
+        print(f"no additional collateral is required to draw {str(amount)} Usdv")
     assert mcd.vat.frob(c.ilk, usr, dink, amount).transact(from_address=usr)
     assert mcd.vat.urn(c.ilk, usr).art >= Wad(amount)
 
 
-def purchase_dai(amount: Wad, recipient: Address):
+def purchase_usdv(amount: Wad, recipient: Address):
     assert isinstance(amount, Wad)
     assert isinstance(recipient, Address)
 
     m = mcd(web3())
     seller = gal_address(web3())
-    reserve_dai(m, m.collaterals['ETH-C'], seller, amount)
-    m.approve_dai(seller)
-    m.approve_dai(recipient)
-    assert m.dai_adapter.exit(seller, amount).transact(from_address=seller)
-    assert m.dai.transfer_from(seller, recipient, amount).transact(from_address=seller)
+    reserve_usdv(m, m.collaterals['VLX-C'], seller, amount)
+    m.approve_usdv(seller)
+    m.approve_usdv(recipient)
+    assert m.usdv_adapter.exit(seller, amount).transact(from_address=seller)
+    assert m.usdv.transfer_from(seller, recipient, amount).transact(from_address=seller)
 
 
 def is_cdp_safe(ilk: Ilk, urn: Urn) -> bool:
@@ -251,7 +251,7 @@ def is_cdp_safe(ilk: Ilk, urn: Urn) -> bool:
 
 
 def create_risky_cdp(mcd: DssDeployment, c: Collateral, collateral_amount: Wad, gal_address: Address,
-                     draw_dai=True) -> Urn:
+                     draw_usdv=True) -> Urn:
     assert isinstance(mcd, DssDeployment)
     assert isinstance(c, Collateral)
     assert isinstance(gal_address, Address)
@@ -291,22 +291,22 @@ def create_risky_cdp(mcd: DssDeployment, c: Collateral, collateral_amount: Wad, 
         print(f"Frobbing {c.ilk.name} with ink={urn.ink} and dart={dart}")
         assert mcd.vat.frob(c.ilk, gal_address, Wad(0), dart).transact(from_address=gal_address)
 
-    # Draw our Dai, simulating the usual behavior
+    # Draw our Usdv, simulating the usual behavior
     urn = mcd.vat.urn(c.ilk, gal_address)
-    if draw_dai and urn.art > Wad(0):
-        mcd.approve_dai(gal_address)
-        assert mcd.dai_adapter.exit(gal_address, urn.art).transact(from_address=gal_address)
-        print(f"Exited {urn.art} Dai from urn")
+    if draw_usdv and urn.art > Wad(0):
+        mcd.approve_usdv(gal_address)
+        assert mcd.usdv_adapter.exit(gal_address, urn.art).transact(from_address=gal_address)
+        print(f"Exited {urn.art} Usdv from urn")
     return urn
 
 
 def create_unsafe_cdp(mcd: DssDeployment, c: Collateral, collateral_amount: Wad, gal_address: Address,
-                      draw_dai=True) -> Urn:
+                      draw_usdv=True) -> Urn:
     assert isinstance(mcd, DssDeployment)
     assert isinstance(c, Collateral)
     assert isinstance(gal_address, Address)
 
-    create_risky_cdp(mcd, c, collateral_amount, gal_address, draw_dai)
+    create_risky_cdp(mcd, c, collateral_amount, gal_address, draw_usdv)
     urn = mcd.vat.urn(c.ilk, gal_address)
 
     # Manipulate price to make gal CDP underwater
@@ -326,7 +326,7 @@ def create_cdp_with_surplus(mcd: DssDeployment, c: Collateral, gal_address: Addr
     # Ensure there is no debt which a previous test failed to clean up
     assert mcd.vat.sin(mcd.vow.address) == Rad(0)
 
-    joy_before = mcd.vat.dai(mcd.vow.address)
+    joy_before = mcd.vat.usdv(mcd.vow.address)
 
     ink = Wad.from_number(10)
     art = max_dart_for_ink(mcd, c, ink) - Wad(1)
@@ -336,14 +336,14 @@ def create_cdp_with_surplus(mcd: DssDeployment, c: Collateral, gal_address: Addr
     print(f"collateral={c.ilk.name}, ink={float(ink)}, art={float(art)}, joy_before={float(joy_before)}")
     assert c.adapter.join(gal_address, ink).transact(from_address=gal_address)
     assert mcd.vat.frob(c.ilk, gal_address, dink=ink, dart=art).transact(from_address=gal_address)
-    joy = mcd.vat.dai(mcd.vow.address)
+    joy = mcd.vat.usdv(mcd.vow.address)
     awe = mcd.vat.sin(mcd.vow.address)
     # total surplus > total debt + surplus auction lot size + surplus buffer
     while float(joy) <= float(awe) + float(mcd.vow.bump()) + float(mcd.vow.hump()):
         print(f"joy={float(joy)}; waiting for fees to accumulate")
         time_travel_by(mcd.web3, 3)
         assert mcd.jug.drip(c.ilk).transact(from_address=gal_address)
-        joy = mcd.vat.dai(mcd.vow.address)
+        joy = mcd.vat.usdv(mcd.vow.address)
         awe = mcd.vat.sin(mcd.vow.address)
     print(f"joy={float(joy)} > awe={float(awe)} + bump={float(mcd.vow.bump())} + hump={float(mcd.vow.hump())}")
     assert joy >= joy_before
@@ -367,24 +367,24 @@ def bite(mcd: DssDeployment, c: Collateral, unsafe_cdp: Urn) -> int:
 def repay_urn(mcd, c: Collateral, address: Address) -> bool:
     assert isinstance(c, Collateral)
     assert isinstance(address, Address)
-    mcd.approve_dai(address)
+    mcd.approve_usdv(address)
 
     urn = mcd.vat.urn(c.ilk, address)
     if urn.art > Wad(0):
-        vat_dai = mcd.vat.dai(address)
+        vat_usdv = mcd.vat.usdv(address)
         tab: Wad = urn.art * c.ilk.rate
         wipe: Wad = mcd.vat.get_wipe_all_dart(c.ilk, address)
-        # if we have any Dai, repay all or part of the urn
-        if vat_dai > Rad(0):
-            vat_dai = vat_dai / Rad(c.ilk.rate)  # adjust for Dai available for repayment
-            repay_amount = min(wipe, tab, Wad(vat_dai))
-            print(f"wipe={wipe}, tab={tab}, vat_dai={vat_dai}")
+        # if we have any Usdv, repay all or part of the urn
+        if vat_usdv > Rad(0):
+            vat_usdv = vat_usdv / Rad(c.ilk.rate)  # adjust for Usdv available for repayment
+            repay_amount = min(wipe, tab, Wad(vat_usdv))
+            print(f"wipe={wipe}, tab={tab}, vat_usdv={vat_usdv}")
             print(f"{c.ilk.name} dust is {float(c.ilk.dust)}")
-            print(f"repaying {repay_amount} Dai on {c.ilk.name} urn {address}; art={urn.art}")
+            print(f"repaying {repay_amount} Usdv on {c.ilk.name} urn {address}; art={urn.art}")
             assert mcd.vat.frob(c.ilk, address, Wad(0), repay_amount*-1).transact(from_address=address)
             urn = mcd.vat.urn(c.ilk, address)
         else:
-            print(f"{address} has no Dai to repay tab of {float(tab)}")
+            print(f"{address} has no Usdv to repay tab of {float(tab)}")
     else:
         print(f"{c.ilk.name} urn {address} has no debt")
 
@@ -403,13 +403,13 @@ def repay_urn(mcd, c: Collateral, address: Address) -> bool:
         return False
 
 
-def liquidate_urn(mcd, c: Collateral, address: Address, bidder: Address, c_dai: Collateral = None):
+def liquidate_urn(mcd, c: Collateral, address: Address, bidder: Address, c_usdv: Collateral = None):
     assert isinstance(c, Collateral)
     assert isinstance(address, Address)
     assert isinstance(bidder, Address)
 
-    if c_dai is None:
-        c_dai = c
+    if c_usdv is None:
+        c_usdv = c
 
     # Ensure the CDP isn't safe
     urn = mcd.vat.urn(c.ilk, address)
@@ -427,14 +427,14 @@ def liquidate_urn(mcd, c: Collateral, address: Address, bidder: Address, c_dai: 
         assert mcd.dog.bark(c.ilk, urn).transact()
         kick = c.clipper.kicks()
         (needs_redo, auction_price, lot, tab) = c.clipper.status(kick)
-        purchase_dai(Wad(tab) + Wad(1), address)
-        assert mcd.dai_adapter.join(address, Wad(tab) + Wad(1)).transact(from_address=address)
-        assert mcd.vat.dai(address) >= tab
+        purchase_usdv(Wad(tab) + Wad(1), address)
+        assert mcd.usdv_adapter.join(address, Wad(tab) + Wad(1)).transact(from_address=address)
+        assert mcd.vat.usdv(address) >= tab
         bid_price = tab / Rad(lot)
         while auction_price > bid_price:
             time_travel_by(mcd.web3, 1)
             (needs_redo, auction_price, lot, tab) = c.clipper.status(kick)
-        print(f"taking lot {lot} on auction {kick} at {bid_price} with {mcd.vat.dai(bidder)} Dai remaining")
+        print(f"taking lot {lot} on auction {kick} at {bid_price} with {mcd.vat.usdv(bidder)} Usdv remaining")
         assert c.clipper.take(kick, lot, bid_price).transact(from_address=address)
 
     elif c.flipper:
@@ -456,8 +456,8 @@ def liquidate_urn(mcd, c: Collateral, address: Address, bidder: Address, c_dai: 
                 print(f"biting {next_kick} ({next_kick - first_kick + 1} of {bites_required})")
                 kick = bite(mcd, c, urn)
                 auction = c.flipper.bids(kick)
-                reserve_dai(mcd, c_dai, bidder, Wad(auction.tab)+Wad(1))
-                print(f"bidding tab {auction.tab} on auction {kick} for {auction.lot} with {mcd.vat.dai(bidder)} Dai remaining")
+                reserve_usdv(mcd, c_usdv, bidder, Wad(auction.tab) + Wad(1))
+                print(f"bidding tab {auction.tab} on auction {kick} for {auction.lot} with {mcd.vat.usdv(bidder)} Usdv remaining")
                 assert c.flipper.tend(kick, auction.lot, auction.tab).transact(from_address=bidder)
                 urn = mcd.vat.urn(c.ilk, address)
 
@@ -490,7 +490,7 @@ def flog_and_heal(web3: Web3, mcd: DssDeployment, past_blocks=8, kiss=True, requ
         assert mcd.vow.ash() == Rad.from_number(0)
 
     # Cancel out surplus and debt
-    joy = mcd.vat.dai(mcd.vow.address)
+    joy = mcd.vat.usdv(mcd.vow.address)
     woe = mcd.vow.woe()
     if require_heal:
         assert joy <= woe

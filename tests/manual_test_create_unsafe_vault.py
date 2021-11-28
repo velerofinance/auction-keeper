@@ -51,7 +51,7 @@ multiplier = float(sys.argv[4]) if len(sys.argv) > 4 else 1.0  # larger urns acc
 ilk = mcd.vat.ilk(collateral.ilk.name)
 token = Token(collateral.gem.symbol(), collateral.gem.address, collateral.adapter.dec())
 urn = mcd.vat.urn(collateral.ilk, our_address)
-# mcd.approve_dai(our_address)                  # Uncomment upon first execution for the account
+# mcd.approve_usdv(our_address)                  # Uncomment upon first execution for the account
 # Transact.gas_estimate_for_bad_txs = 20000     # Uncomment to debug transaction failures onchain
 osm_price = collateral.pip.peek()
 
@@ -103,12 +103,12 @@ def handle_returned_collateral():
     # Handle collateral returned to the urn after a liquidation is dealt
     available_to_generate = (urn.ink * ilk.spot) - Wad(Ray(urn.art) * ilk.rate)
     if available_to_generate > token.min_amount + flub_amount:
-        logging.info(f"Attempting to generate {available_to_generate} Dai")
+        logging.info(f"Attempting to generate {available_to_generate} Usdv")
         mcd.vat.frob(ilk, our_address, Wad(0), available_to_generate).transact()
-    dai_balance = Wad(mcd.vat.dai(our_address)) - Wad(1)
-    if dai_balance > token.min_amount:
-        logging.info(f"Attempting to exit {dai_balance} Dai")
-        mcd.dai_adapter.exit(our_address, dai_balance).transact()
+    usdv_balance = Wad(mcd.vat.usdv(our_address)) - Wad(1)
+    if usdv_balance > token.min_amount:
+        logging.info(f"Attempting to exit {usdv_balance} Usdv")
+        mcd.usdv_adapter.exit(our_address, usdv_balance).transact()
 
 
 create_risky_vault()

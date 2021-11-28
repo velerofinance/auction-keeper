@@ -55,7 +55,7 @@ class Strategy:
 
 
 class StrategyTakeAvailable(Strategy):
-    def bid_available(self, id: int, price: Wad, available_dai: Rad):
+    def bid_available(self, id: int, price: Wad, available_usdv: Rad):
         raise NotImplementedError
 
 
@@ -96,7 +96,7 @@ class ClipperStrategy(StrategyTakeAvailable):
                       end=None,
                       price=auction_price)             # Current price of auction
 
-    def bid_available(self, id: int, our_price: Wad, available_dai: Rad) -> Tuple[Optional[Wad], Optional[Transact], Optional[Rad]]:
+    def bid_available(self, id: int, our_price: Wad, available_usdv: Rad) -> Tuple[Optional[Wad], Optional[Transact], Optional[Rad]]:
         assert isinstance(id, int)
         assert isinstance(our_price, Wad)
 
@@ -109,22 +109,22 @@ class ClipperStrategy(StrategyTakeAvailable):
         our_lot = lot
         if Ray(our_price) >= auction_price:
 
-            if Wad(available_dai) > Wad(0):  # TODO: Perhaps compare it with some dust amount?
-                # Calculate how much of the lot we can afford with Dai available, don't bid for more than that
-                lot_we_can_afford: Wad = Wad(available_dai / Rad(auction_price))
+            if Wad(available_usdv) > Wad(0):  # TODO: Perhaps compare it with some dust amount?
+                # Calculate how much of the lot we can afford with Usdv available, don't bid for more than that
+                lot_we_can_afford: Wad = Wad(available_usdv / Rad(auction_price))
                 if lot_we_can_afford < lot:
-                    self.logger.debug(f"with {available_dai} Dai we can afford to bid on {float(lot_we_can_afford)} "
+                    self.logger.debug(f"with {available_usdv} Usdv we can afford to bid on {float(lot_we_can_afford)} "
                                      f"out of {float(lot)} at {float(auction_price)} on auction {id}")
                     our_lot = lot_we_can_afford
 
             if our_lot <= self.min_lot:
                 self.logger.debug(f"our lot {our_lot} less than configured minimum {self.min_lot} for auction {id}")
-                # even if we won't take, return cost of full lot at our_price to flag Dai starvation and rebalance Dai
+                # even if we won't take, return cost of full lot at our_price to flag Usdv starvation and rebalance Usdv
                 return None, None, Rad(lot) * Rad(our_price)
 
             if not self.debt_exceeds_chost(our_lot, auction_price, lot, tab):
                 self.logger.debug(f"slice {our_lot} won't cover enough debt to clear the chop*dust floor")
-                # again, return cost of full lot to flag Dai starvation and rebalance Dai
+                # again, return cost of full lot to flag Usdv starvation and rebalance Usdv
                 return None, None, Rad(lot) * Rad(our_price)
 
             self.logger.debug(f"taking {our_lot} from auction {id} at {auction_price}")
@@ -232,17 +232,17 @@ class FlipperStrategy(Strategy):
 
 
 class FlapperStrategy(Strategy):
-    def __init__(self, flapper: Flapper, mkr: Address):
+    def __init__(self, flapper: Flapper, vdgt: Address):
         assert isinstance(flapper, Flapper)
-        assert isinstance(mkr, Address)
+        assert isinstance(vdgt, Address)
         super().__init__(flapper)
 
         self.flapper = flapper
         self.beg = flapper.beg()
-        self.mkr = mkr
+        self.vdgt = vdgt
 
     def approve(self, gas_price: GasPrice):
-        self.flapper.approve(self.mkr, directly(gas_price=gas_price))
+        self.flapper.approve(self.vdgt, directly(gas_price=gas_price))
 
     def kicks(self) -> int:
         return self.flapper.kicks()
