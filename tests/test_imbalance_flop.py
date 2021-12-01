@@ -39,7 +39,7 @@ from web3 import Web3
 
 @pytest.fixture(scope="session")
 def c(mcd):
-    return mcd.collaterals['ETH-A']
+    return mcd.collaterals['VLX-A']
 
 
 @pytest.fixture()
@@ -50,7 +50,7 @@ def kick(web3: Web3, mcd: DssDeployment, gal_address, other_address) -> int:
 
     if woe < joy:
         # Bite gal CDP
-        c = mcd.collaterals['ETH-A']
+        c = mcd.collaterals['VLX-A']
         unsafe_cdp = create_unsafe_cdp(mcd, c, Wad.from_number(2), other_address, draw_usdv=False)
         flip_kick = bite(mcd, c, unsafe_cdp)
 
@@ -98,13 +98,13 @@ class TestAuctionKeeperFlopper(TransactionIgnoringTest):
         assert isinstance(self.keeper.gas_price, DynamicGasPrice)
         self.default_gas_price = self.keeper.gas_price.get_gas_price(0)
 
-        reserve_usdv(self.mcd, self.mcd.collaterals['ETH-C'], self.keeper_address, Wad.from_number(200.00000))
-        reserve_usdv(self.mcd, self.mcd.collaterals['ETH-C'], self.other_address, Wad.from_number(200.00000))
+        reserve_usdv(self.mcd, self.mcd.collaterals['VLX-C'], self.keeper_address, Wad.from_number(200.00000))
+        reserve_usdv(self.mcd, self.mcd.collaterals['VLX-C'], self.other_address, Wad.from_number(200.00000))
 
         self.sump = self.mcd.vow.sump()  # Rad
 
     def teardown_method(self):
-        c = self.mcd.collaterals['ETH-A']
+        c = self.mcd.collaterals['VLX-A']
         set_collateral_price(self.mcd, c, Wad.from_number(200.00))
 
     def dent(self, id: int, address: Address, lot: Wad, bid: Rad):
@@ -580,7 +580,7 @@ class TestAuctionKeeperFlopper(TransactionIgnoringTest):
 
     def test_should_not_deal_when_auction_finished_but_somebody_else_won(self, kick):
         # given
-        mkr_before = self.mcd.vdgt.balance_of(self.keeper_address)
+        vdgt_before = self.mcd.vdgt.balance_of(self.keeper_address)
         # and
         self.dent(kick, self.other_address, Wad.from_number(0.000015), self.sump)
         assert self.flopper.bids(kick).lot == Wad.from_number(0.000015)
@@ -591,8 +591,8 @@ class TestAuctionKeeperFlopper(TransactionIgnoringTest):
         self.keeper.check_all_auctions()
         wait_for_other_threads()
         # then
-        mkr_after = self.mcd.vdgt.balance_of(self.keeper_address)
-        assert mkr_before == mkr_after
+        vdgt_after = self.mcd.vdgt.balance_of(self.keeper_address)
+        assert vdgt_before == vdgt_after
 
     def test_should_obey_gas_price_provided_by_the_model(self, kick):
         # given
@@ -683,7 +683,7 @@ class TestAuctionKeeperFlopper(TransactionIgnoringTest):
     @classmethod
     def teardown_class(cls):
         cls.cleanup_debt(cls.web3, cls.mcd)
-        c = cls.mcd.collaterals['ETH-A']
+        c = cls.mcd.collaterals['VLX-A']
         assert get_collateral_price(c) == Wad.from_number(200.00)
         if not repay_urn(cls.mcd, c, cls.gal_address):
             liquidate_urn(cls.mcd, c, cls.gal_address, cls.keeper_address)

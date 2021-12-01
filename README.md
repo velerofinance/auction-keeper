@@ -3,7 +3,7 @@
 ![Build Status](https://github.com/makerdao/auction-keeper/actions/workflows/.github/workflows/tests.yaml/badge.svg?branch=master)
 [![codecov](https://codecov.io/gh/makerdao/auction-keeper/branch/master/graph/badge.svg)](https://codecov.io/gh/makerdao/auction-keeper)
 
-The _DAI Stablecoin System_ incentivizes external agents, called _keepers_, to automate certain operations around the
+The _USDV Stablecoin System_ incentivizes external agents, called _keepers_, to automate certain operations around the
 Ethereum blockchain.  The purpose of `auction-keeper` is to:
  * Seek out opportunities and start new auctions
  * Detect auctions started by other participants
@@ -12,8 +12,8 @@ Ethereum blockchain.  The purpose of `auction-keeper` is to:
 Check out the <a href="https://youtu.be/wevzK3ADEjo?t=733">July 23rd, 2019 community meeting</a>
 for some more information about MCD auctions and the purpose of this component.
 
-`auction-keeper` can participate in `clip` and `flip` (collateral sale), `flap` (MKR buy-and-burn)
-and `flop` (MKR minting) auctions. Its unique feature is the ability to plug in external
+`auction-keeper` can participate in `clip` and `flip` (collateral sale), `flap` (VDGT buy-and-burn)
+and `flop` (VDGT minting) auctions. Its unique feature is the ability to plug in external
 _bidding models_, which tell the keeper when and how high to bid. This keeper can be safely
 left running in background. The moment it notices or starts a new auction it will spawn a new instance
 of a _bidding model_ for it and then act according to its instructions. _Bidding models_ will
@@ -105,8 +105,8 @@ A sample message sent from the model to the keeper may look like:
 {"price": "750.0"}
 ```
 
-Whenever the keeper and the model communicate in terms of prices, it is the MKR/DAI price (for `flap`
-and `flop` auctions) or the collateral price expressed in DAI e.g. DGX/DAI (for `clip` or `flip` auctions).
+Whenever the keeper and the model communicate in terms of prices, it is the VDGT/USDV price (for `flap`
+and `flop` auctions) or the collateral price expressed in USDV e.g. VDGT/USDV (for `clip` or `flip` auctions).
 
 Any messages writen by a _bidding model_ to **stderr** will be passed through by the keeper to its logs.
 This is the most convenient way of implementing logging from _bidding models_.
@@ -128,14 +128,17 @@ while true; do
 done
 ```
 
-The stdout provides a price for the collateral (for `clip` and `flip` auctions) or MKR (for `flap` and `flop` auctions).  The
+The stdout provides a price for the collateral (for `clip` and `flip` auctions) or VDGT (for `flap` and `flop` auctions).  The
 sleep locks the price in place for the specified duration, after which the keeper will restart the price model and read a new price.  
 Consider this your price update interval.  To conserve system resources, take care not to set this too low.
 
-### Other bidding models
-Thanks to our community for these examples:
- * *banteg*'s [Python boilerplate model](https://gist.github.com/banteg/93808e6c0f1b9b6b470beaba5a140813)
- * *theogravity*'s [NodeJS bidding model](https://github.com/theogravity/dai-auction-keeper)
+[comment]: <> (### Other bidding models)
+
+[comment]: <> (Thanks to our community for these examples:)
+
+[comment]: <> ( * *banteg*'s [Python boilerplate model]&#40;https://gist.github.com/banteg/93808e6c0f1b9b6b470beaba5a140813&#41;)
+
+[comment]: <> ( * *theogravity*'s [NodeJS bidding model]&#40;https://github.com/theogravity/dai-auction-keeper&#41;)
 
 
 ## Limitations
@@ -150,7 +153,7 @@ the following actions:
   * queuing debt for auction
   * biting a vault or starting a flap or flop auction
 * The keeper does not check model prices until an auction exists.  When configured to create new auctions, it will
-`bite`, `flap`, or `flop` in response to opportunities regardless of whether or not your Dai or MKR balance is
+`bite`, `flap`, or `flop` in response to opportunities regardless of whether or not your Usdv or VDGT balance is
 sufficient to participate.  This too imposes a gas fee.
 * Biting vaults to kick off new collateral auctions is an expensive operation.  To do so without a VulcanizeDB
 subscription, the keeper initializes a cache of urn state by scraping event logs from the chain.  The keeper will then
@@ -186,7 +189,7 @@ corresponding to a set of risk parameters.  For example, `ETH-A` and `ETH-B` are
 same underlying token (WETH).  Regardless of whether a keeper is configured for `--clip` or `--flip`, the keeper will 
 choose the appropriate collateral liquidation contract for the specified `--ilk` and addresses configured in `pymaker`.
 
-Configure `--from-block` to the block where MCD was deployed.  One way to find this is to look at the `MCD_DAI`
+Configure `--from-block` to the block where MCD was deployed.  One way to find this is to look at the `MCD_USDV`
 contract of the deployment you are using and determine the block in which it was deployed.
 
 ![example list of keepers](README-keeper-config-example.png)
@@ -221,27 +224,27 @@ generally advisable to allow the keeper to manage gas prices for bids, and _not_
 
 ### Accounting
 Key points:
-- Dai must be **joined** from a token balance to the `Vat` for bidding on `clip`, `flip` and `flop` auctions.
+- Usdv must be **joined** from a token balance to the `Vat` for bidding on `clip`, `flip` and `flop` auctions.
 - Won collateral can be **exited** from the `Vat` to a token balance after a won auction is dealt (closed).
-- MKR for/from `flap`/`flop` auctions is managed directly through token balances and is never joined to the `Vat`.
+- VDGT for/from `flap`/`flop` auctions is managed directly through token balances and is never joined to the `Vat`.
 
 The keeper provides facilities for managing `Vat` balances, which may be turned off to manage manually.
-To manually control the amount of Dai in the `Vat`, pass `--keep-dai-in-vat-on-exit` and `--keep-gem-in-vat-on-exit`,
+To manually control the amount of Usdv in the `Vat`, pass `--keep-dai-in-vat-on-exit` and `--keep-gem-in-vat-on-exit`,
 set `--return-gem-interval 0`, and do not pass `--vat-dai-target`.
 
 Warnings: **Do not use an `eth-from` account on multiple keepers** as it complicates Vat inventory management and
 will likely cause nonce conflicts.  Using an `eth-from` account with an open vault is also discouraged.
 
-#### Dai
-All auction contracts exclusively interact with Dai (for all auctions) in the `Vat`.  `--vat-dai-target` may be set to
+#### Usdv
+All auction contracts exclusively interact with Usdv (for all auctions) in the `Vat`.  `--vat-dai-target` may be set to
 the amount you wish to maintain, or `all` to join your account's entire token balance.  Rebalances do not account for
-Dai moved from the `Vat` to an auction contract for an active bid.  Dai is rebalanced per `--vat-dai-target` when:
+Usdv moved from the `Vat` to an auction contract for an active bid.  Usdv is rebalanced per `--vat-dai-target` when:
 - The keeper starts up
 - `Vat` balance is insufficient to place a bid
 - An auction is dealt
 
-To avoid transaction spamming, small "dusty" Dai balances will be ignored (until the keeper exits, if so configured).  
-By default, all Dai in your `eth-from` account is exited from the `Vat` and added to your token balance when the keeper
+To avoid transaction spamming, small "dusty" Usdv balances will be ignored (until the keeper exits, if so configured).  
+By default, all Usdv in your `eth-from` account is exited from the `Vat` and added to your token balance when the keeper
 is terminated normally.  This feature may be disabled using `--keep-dai-in-vat-on-exit`.
 
 #### Collateral (clip and flip auctions)
@@ -249,16 +252,25 @@ Won collateral is periodically exited by setting `--return-gem-interval` to the 
 checks.  Collateral is exited from the `Vat` when the keeper is terminated normally unless `--keep-gem-in-vat-on-exit`
 is specified.
 
-#### Other tools
-Alternatively, [mcd-cli](https://github.com/makerdao/mcd-cli) can be used to manually manage `Vat` balances.
-Here is an example to join 6000 Dai on a testnet,
-and exit 300 Dai on Kovan, respectively:
-```bash
-mcd -C testnet dai join 6000
-mcd -C kovan dai exit 300
-```
-`mcd-cli` requires installation and configuration; view the
-[mcd-cli README](https://github.com/makerdao/mcd-cli#mcd-command-line-interface) for more information.
+[comment]: <> (#### Other tools)
+
+[comment]: <> (Alternatively, [mcd-cli]&#40;https://github.com/makerdao/mcd-cli&#41; can be used to manually manage `Vat` balances.)
+
+[comment]: <> (Here is an example to join 6000 Usdv on a testnet,)
+
+[comment]: <> (and exit 300 Usdv on Kovan, respectively:)
+
+[comment]: <> (```bash)
+
+[comment]: <> (#mcd -C testnet dai join 6000)
+
+[comment]: <> (#mcd -C kovan dai exit 300)
+
+[comment]: <> (```)
+
+[comment]: <> (`mcd-cli` requires installation and configuration; view the)
+
+[comment]: <> ([mcd-cli README]&#40;https://github.com/makerdao/mcd-cli#mcd-command-line-interface&#41; for more information.)
 
 
 ### Managing resources

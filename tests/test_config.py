@@ -38,7 +38,7 @@ class TestTransactionMocking(TransactionIgnoringTest):
         self.mcd = mcd(self.web3)
         self.keeper_address = keeper_address(self.mcd.web3)
         self.web3.eth.defaultAccount = self.keeper_address.address
-        self.collateral = self.mcd.collaterals['ETH-A']
+        self.collateral = self.mcd.collaterals['VLX-A']
         self.collateral.approve(self.keeper_address)
         assert self.collateral.gem.deposit(Wad.from_number(1)).transact()
         self.ilk = self.collateral.ilk
@@ -214,7 +214,7 @@ class TestConfig:
         return AuctionKeeper(args=args(f"--eth-from {keeper_address} "
                                        f"--type flip "
                                        f"--from-block 1 "
-                                       f"--ilk ETH-A "
+                                       f"--ilk VLX-A "
                                        f"--shards 3 --shard-id {shard} "
                                        f"--model ./bogus-model.sh"), web3=web3)
 
@@ -245,7 +245,7 @@ class TestConfig:
 
         default_behavior = AuctionKeeper(args=args(f"--eth-from {keeper_address} "
                                                    f"--type flip --from-block 1 "
-                                                   f"--ilk ETH-A "
+                                                   f"--ilk VLX-A "
                                                    f"--model ./bogus-model.sh"), web3=web3)
         assert 1 == len(default_behavior.deal_for)
         assert keeper_address == list(default_behavior.deal_for)[0]
@@ -277,12 +277,12 @@ class TestConfig:
         with pytest.raises(RuntimeError) as e:
             AuctionKeeper(args=args(f"--eth-from {keeper_address} "
                                     f"--type flip "
-                                    f"--ilk ETH-A "
+                                    f"--ilk VLX-A "
                                     f"--model ./bogus-model.sh"), web3=web3)
 
         keeper = AuctionKeeper(args=args(f"--eth-from {keeper_address} "
                                          f"--type flip "
-                                         f"--ilk ETH-A "
+                                         f"--ilk VLX-A "
                                          f"--bid-only "
                                          f"--model ./bogus-model.sh"), web3=web3)
         assert keeper.urn_history is None

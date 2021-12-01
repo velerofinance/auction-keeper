@@ -30,7 +30,7 @@ from tests.helper import args, kill_other_threads, time_travel_by, wait_for_othe
 
 @pytest.fixture(scope="session")
 def c(mcd):
-    return mcd.collaterals['ETH-C']
+    return mcd.collaterals['VLX-C']
 
 
 @pytest.fixture()

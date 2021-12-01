@@ -24,7 +24,7 @@ fi
 
 # Amount of collateral to join and lock (Wad)
 ink=${1:?}
-# Amount of Dai to draw and exit (Wad)
+# Amount of Usdv to draw and exit (Wad)
 art=${2:?}
 
 #$mcd -C kovan wrap $ink > /dev/null

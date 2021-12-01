@@ -41,9 +41,9 @@ vulcanize_key = os.environ["VULCANIZE_APIKEY"]
 tokenflow_endpoint = os.environ['TOKENFLOW_URL']
 tokenflow_key = os.environ['TOKENFLOW_APIKEY']
 mcd = DssDeployment.from_node(web3)
-collateral_type = sys.argv[1] if len(sys.argv) > 1 else "ETH-A"
+collateral_type = sys.argv[1] if len(sys.argv) > 1 else "VLX-A"
 ilk = mcd.collaterals[collateral_type].ilk
-# on mainnet, use 8928152 for ETH-A/BAT-A; for others, use the block when the join contract was deployed/enabled
+# on mainnet, use 8928152 for VLX-A/BAT-A; for others, use the block when the join contract was deployed/enabled
 from_block = int(sys.argv[2]) if len(sys.argv) > 2 else None
 urns_chain = None
 urns_vdb = None

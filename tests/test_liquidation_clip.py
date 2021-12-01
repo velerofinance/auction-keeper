@@ -35,7 +35,7 @@ from tests.helper import args, time_travel_by, wait_for_other_threads, Transacti
 
 @pytest.fixture(scope="session")
 def collateral_clip(mcd):
-    return mcd.collaterals['ETH-B']
+    return mcd.collaterals['VLX-B']
 
 
 @pytest.fixture()
@@ -59,7 +59,7 @@ class ClipperTest(TransactionIgnoringTest):
         cls.web3 = web3()
         cls.mcd = mcd(cls.web3)
         cls.collateral = collateral_clip(cls.mcd)
-        cls.usdv_collateral = cls.mcd.collaterals['ETH-C']
+        cls.usdv_collateral = cls.mcd.collaterals['VLX-C']
         cls.clipper = cls.collateral.clipper
         cls.keeper_address = keeper_address(cls.web3)
         cls.gal_address = gal_address(cls.web3)

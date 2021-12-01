@@ -34,7 +34,7 @@ def r(value, decimals=1):
 
 web3 = Web3(HTTPProvider(endpoint_uri=os.environ['ETH_RPC_URL'], request_kwargs={"timeout": 10}))
 mcd = DssDeployment.from_node(web3)
-collateral = mcd.collaterals[str(sys.argv[1])] if len(sys.argv) > 1 else mcd.collaterals['ETH-A']
+collateral = mcd.collaterals[str(sys.argv[1])] if len(sys.argv) > 1 else mcd.collaterals['VLX-A']
 ilk = collateral.ilk
 target_art = Rad.from_number(float(sys.argv[2])) if len(sys.argv) > 2 else ilk.dust
 osm_price = collateral.pip.peek()

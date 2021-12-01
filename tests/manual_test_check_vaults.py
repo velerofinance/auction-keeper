@@ -40,7 +40,7 @@ logging.getLogger("requests").setLevel(logging.INFO)
 web3 = Web3(HTTPProvider(endpoint_uri=os.environ["ETH_RPC_URL"], request_kwargs={"timeout": 240}))
 
 mcd = DssDeployment.from_node(web3)
-collateral_type = sys.argv[1] if len(sys.argv) > 1 else "ETH-A"
+collateral_type = sys.argv[1] if len(sys.argv) > 1 else "VLX-A"
 ilk = mcd.collaterals[collateral_type].ilk
 urn_history = None
 

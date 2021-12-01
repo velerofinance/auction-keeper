@@ -46,7 +46,7 @@ logging.getLogger("requests").setLevel(logging.INFO)
 
 mcd = DssDeployment.from_node(web3)
 our_address = Address(web3.eth.defaultAccount)
-collateral = mcd.collaterals[str(sys.argv[3])] if len(sys.argv) > 3 else mcd.collaterals['ETH-A']
+collateral = mcd.collaterals[str(sys.argv[3])] if len(sys.argv) > 3 else mcd.collaterals['VLX-A']
 multiplier = float(sys.argv[4]) if len(sys.argv) > 4 else 1.0  # larger urns accumulate debt faster
 ilk = mcd.vat.ilk(collateral.ilk.name)
 token = Token(collateral.gem.symbol(), collateral.gem.address, collateral.adapter.dec())

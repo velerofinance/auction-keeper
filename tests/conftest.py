@@ -89,7 +89,7 @@ def wrap_eth(mcd: DssDeployment, address: Address, amount: Wad):
     assert isinstance(amount, Wad)
     assert amount > Wad(0)
 
-    collateral = mcd.collaterals['ETH-A']
+    collateral = mcd.collaterals['VLX-A']
     assert isinstance(collateral.gem, DSEthToken)
     assert collateral.gem.deposit(amount).transact(from_address=address)
 
@@ -273,7 +273,7 @@ def create_risky_cdp(mcd: DssDeployment, c: Collateral, collateral_amount: Wad, 
             # handle dusty balances with non-18-decimal tokens
             vat_gap = dink - vat_balance + token.min_amount
             if balance < vat_gap:
-                if c.ilk.name.startswith("ETH"):
+                if c.ilk.name.startswith("VLX"):
                     wrap_eth(mcd, gal_address, vat_gap)
                 else:
                     raise RuntimeError("Insufficient collateral balance")

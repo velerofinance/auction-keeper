@@ -32,7 +32,7 @@ every_secs = 42
 class TestGasStrategy:
     def test_consolidated_gas_oracles(self, mcd, keeper_address):
         # given
-        c = mcd.collaterals['ETH-A']
+        c = mcd.collaterals['VLX-A']
         keeper = AuctionKeeper(args=args(f"--eth-from {keeper_address} "
                                          f"--type flip "
                                          f"--from-block 1 "
@@ -62,7 +62,7 @@ class TestGasStrategy:
         assert keeper.gas_price.get_gas_price(every_secs * 80) == default_max_gas * GWEI
 
     def test_no_api_non_fixed(self, mcd, keeper_address):
-        c = mcd.collaterals['ETH-A']
+        c = mcd.collaterals['VLX-A']
 
         reactive_multipler = 1.125 * 3
 

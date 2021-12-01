@@ -51,26 +51,20 @@ dss = """
        "MCD_DRIP": "0x891C04639a5edcaE088E546FA125B5d7FB6A2b9D",
        "MCD_CAT": "0x2F34f22a00eE4b7a8F8BBC4eAee1658774c624e0",
        "MCD_VOW": "0x3728e9777B2a0a611ee0F89e00E01044ce4736d1",
-       "MCD_DAI": "0x444254706E8F1FB62a6EC26A7FA2b942ef672495",
-       "MCD_JOIN_DAI": "0xfCbecd1A2AC11A260f6fF9De400F815F2906A2Bd",
-       "MCD_MOVE_DAI": "0xC579CdF20dB327F4c191C7F25e0710e3d0c02195",
+       "MCD_USDV": "0x444254706E8F1FB62a6EC26A7FA2b942ef672495",
+       "MCD_JOIN_USDV": "0xfCbecd1A2AC11A260f6fF9De400F815F2906A2Bd",
+       "MCD_MOVE_USDV": "0xC579CdF20dB327F4c191C7F25e0710e3d0c02195",
        "MCD_FLAP": "0x8868BAd8e74FcA4505676D1B5B21EcC23328d132",
        "MCD_FLOP": "0x6191C9b0086c2eBF92300cC507009b53996FbFFa",
        "MCD_MOM": "0x2D13FF37CdBcdB60b5C298B95B3E360BEC147e7E",
-       "PIP_ETH": "0x9FfFE440258B79c5d6604001674A4722FfC0f7Bc",
-       "MCD_JOIN_ETH": "0x3Ccd75157dc0Ec69141294eDa7a3657a4db8a399",
-       "MCD_MOVE_ETH": "0xeFE0A31B90C3a81E18E329Dba100F96B7bC01860",
-       "MCD_FLIP_ETH": "0x32D496Ad866D110060866B7125981C73642cc509",
-       "MCD_SPOT_ETH": "0x0a787b0c65A6b4ffDE2C10c01eb4AC7409606533",
-       "MCD_DAI_GUARD": "0x3ae1854375fFe3E4aba159529f19064E6940DFB7",
-       "REP": "0x6FDc84f76093FA02facfB08844f5Fb240A08C1d6",
-       "PIP_REP": "0xf88bBDc1E2718F8857F30A180076ec38d53cf296",
-       "MCD_JOIN_REP": "0x5DF073FEb82b95Af2b3C90AE458201b997512ff7",
-       "MCD_MOVE_REP": "0x32B9C412e8c0055Fb74f723B5b17c253f911d389",
-       "MCD_FLIP_REP": "0xC0851F73CC8DD5c0765E71980eC7E7Fd1EF74434",
-       "MCD_SPOT_REP": "0x6639d21C843eAAdF72c9eEC8108b6F6faE569490",
-       "COLLATERALS": ["ETH", "REP"],
-       "ETH": "0x0000000000000000000000000000000000000000"
+       "PIP_VLX": "0x9FfFE440258B79c5d6604001674A4722FfC0f7Bc",
+       "MCD_JOIN_VLX": "0x3Ccd75157dc0Ec69141294eDa7a3657a4db8a399",
+       "MCD_MOVE_VLX": "0xeFE0A31B90C3a81E18E329Dba100F96B7bC01860",
+       "MCD_FLIP_VLX": "0x32D496Ad866D110060866B7125981C73642cc509",
+       "MCD_SPOT_VLX": "0x0a787b0c65A6b4ffDE2C10c01eb4AC7409606533",
+       "MCD_USDV_GUARD": "0x3ae1854375fFe3E4aba159529f19064E6940DFB7",
+       "COLLATERALS": ["VLX"
+       "VLX": "0x0000000000000000000000000000000000000000"
     }
 """
 if arguments.json_from:
@@ -99,19 +93,19 @@ def print_balances():
         return table.draw()
 
     datas = []
-    datas.append(["DAI",
-                  format_amount(d.dai.balance_of(our_address)),
-                  format_amount(d.vat.dai(our_address)),
+    datas.append(["USDV",
+                  format_amount(d.usdv.balance_of(our_address)),
+                  format_amount(d.vat.usdv(our_address)),
                   "", ""])
-    datas.append(["MKR", format_amount(d.vdgt.balance_of(our_address)),
+    datas.append(["VDGT", format_amount(d.vdgt.balance_of(our_address)),
                   "", "", ""])
-    datas.append(["ETH",
+    datas.append(["VLX",
                   format_amount(Wad(w3.eth.getBalance(our_address.address))),
-                  format_amount(d.vat.gem(Ilk('ETH'), our_address)),
-                  format_amount(d.vat.urn(Ilk('ETH'), our_address).ink),
-                  format_amount(d.vat.urn(Ilk('ETH'), our_address).art),
+                  format_amount(d.vat.gem(Ilk('VLX'), our_address)),
+                  format_amount(d.vat.urn(Ilk('VLX'), our_address).ink),
+                  format_amount(d.vat.urn(Ilk('VLX'), our_address).art),
                   ])
-    for c in [c for c in d.collaterals if c.ilk.name != 'ETH']:
+    for c in [c for c in d.collaterals if c.ilk.name != 'VLX']:
         datas.append([c.ilk.name,
                       format_amount(c.gem.balance_of(our_address)),
                       format_amount(d.vat.gem(c.ilk, our_address)),

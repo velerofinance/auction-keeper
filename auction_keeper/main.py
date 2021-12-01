@@ -70,7 +70,8 @@ class AuctionKeeper:
         parser.add_argument('--type', type=str, choices=['clip', 'flip', 'flap', 'flop'],
                             help="Auction type in which to participate")
         parser.add_argument('--ilk', type=str,
-                            help="Name of the collateral type for a clip or flip keeper (e.g. 'ETH-B', 'ZRX-A'); "
+                            help="Name of the collateral type for a clip or flip keeper (e.g. 'VLX"
+                                 "-B', 'ZRX-A'); "
                                  "available collateral types can be found at the left side of the Oasis Borrow")
 
         parser.add_argument('--bid-only', dest='create_auctions', action='store_false',
@@ -330,7 +331,7 @@ class AuctionKeeper:
             logging.info("Keeper will perform the following operation(s) in parallel:")
             [logging.info(line) for line in notice_string]
 
-            if (self.auction_type in ['clip', 'flip']) and self.ilk and self.ilk.name == "ETH-A":
+            if (self.auction_type in ['clip', 'flip']) and self.ilk and self.ilk.name == "VLX-A":
                 logging.info("*** When Keeper is dealing/bidding, the initial evaluation of auctions will likely take > 45 minutes without setting a lower boundary via '--min-auction' ***")
                 logging.info("*** When Keeper is kicking, initializing urn history may take > 30 minutes without using VulcanizeDB via `--vulcanize-endpoint` ***")
         else:

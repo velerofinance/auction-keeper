@@ -34,7 +34,7 @@ class TestVatUsdv:
         self.mcd.approve_usdv(self.keeper_address)
         self.our_address = our_address(web3())
         self.mcd.approve_usdv(self.our_address)
-        self.collateral = self.mcd.collaterals['ETH-A']
+        self.collateral = self.mcd.collaterals['VLX-A']
 
     def get_usdv_token_balance(self) -> Wad:
         return self.mcd.usdv.balance_of(self.keeper_address)
@@ -253,7 +253,7 @@ class TestRebalance(TestVatUsdv):
         # Create a keeper
         mocker.patch("web3.net.Net.peer_count", return_value=1)
         self.keeper = AuctionKeeper(args=args(f"--eth-from {self.keeper_address} "
-                                         f"--type flip --ilk ETH-A --bid-only "
+                                         f"--type flip --ilk VLX-A --bid-only "
                                          f"--vat-dai-target {usdv_target} "
                                          f"--return-gem-interval 3 "
                                          f"--model ./bogus-model.sh"), web3=self.web3)
@@ -358,7 +358,7 @@ class TestRebalance(TestVatUsdv):
             assert self.get_gem_token_balance() == token_balance_before
             assert self.get_gem_vat_balance() == vat_balance_before
 
-            # when some ETH was wrapped and joined
+            # when some VLX was wrapped and joined
             wrap_eth(self.mcd, self.keeper_address, Wad.from_number(1.53))
             token_balance = self.get_gem_token_balance()
             assert token_balance > Wad(0)
