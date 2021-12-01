@@ -1,3 +1,5 @@
 pytz == 2017.3
 web3 == 5.12.0
 requests == 2.22.0
+-e git+https://github.com/velerofinance/pymaker.git#egg=pymaker
+-e git+https://github.com/velerofinance/pygasprice-client.git#egg=pygasprice_client
